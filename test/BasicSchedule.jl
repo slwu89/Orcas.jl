@@ -1,6 +1,7 @@
 using Catlab, DataFrames
 using JuMP, HiGHS
 using Orcas, Orcas.BasicSchedule
+using Test
 
 # --------------------------------------------------------------------------------
 # basic CPM examples
@@ -173,45 +174,15 @@ cg = Subobject(projnet_npv, V=cV, E=cE)
 to_graphviz(cg, node_labels=:label)
 
 # optimize it
-g = deepcopy(projnet_npv)
-α = 0.01
-jumpmod = JuMP.Model(HiGHS.Optimizer)
+optimize_ProjGraphNPV(projnet_npv, 0.01)
 
-# dv: when does each task finish + the constraint for them to all actually finish (4.25, 4.27)
-for v in vertices(g)
-    g[v,:x] = @variable(
-        jumpmod,
-        [t ∈ g[v,:ef]:g[v,:lf]],
-        Bin
-    )
-    @constraint(
-        jumpmod,
-        sum(g[v,:x]) == 1
-    )
-end
+# negative cash flow tasks are scheduled as late as possible
+neg_cash = [:A,:H,:D,:I]
+neg_cash_ix = vcat(incident(projnet_npv, neg_cash, :label)...)
+@test projnet_npv[neg_cash_ix, :lf] == Float64.(projnet_npv[neg_cash_ix, :x])
 
-# con: precedence relations among activities (4.26)
-for e in edges(g)
-    tgt_start = sum(t->(t-g[e, (:tgt, :duration)]) * g[e, (:tgt, :x)][t], g[e, (:tgt, :ef)]:g[e, (:tgt, :lf)])
-    src_end = sum(t->t * g[e, (:src, :x)][t], g[e, (:src, :ef)]:g[e, (:src, :lf)])
-    @constraint(
-        jumpmod,
-        tgt_start - src_end ≥ 0
-    )
-end
+# non-critical positive cash flow tasks are scheduled as early as possible
+pos_cash = [:C,:F,:G,:J]
+pos_cash_ix = vcat(incident(projnet_npv, pos_cash, :label)...)
 
-# # con: due date (4.28)
-# @constraint(
-#     jumpmod,
-#     sum(t->t * g[nv(g), :x][t], 1:D) ≤ D
-# )
-
-# obj: maximize NPV
-@expression(jumpmod, npv[v in vertices(g)], sum(exp(-α*t)*g[v, :C]*g[v, :x] for t in g[v, :ef]:g[v, :lf]))
-@objective(jumpmod, Max, sum(sum.(jumpmod[:npv])))
-
-optimize!(jumpmod)
-    
-for v in vertices(g)
-    g[v,:x] = sum(t*value(g[v,:x][t]) for t in g[v,:ef]:g[v,:lf])
-end
+@test projnet_npv[pos_cash_ix, :ef] == Float64.(projnet_npv[pos_cash_ix, :x])

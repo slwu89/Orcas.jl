@@ -7,9 +7,11 @@ Most of the content in this module is from the following references:
   3. Eiselt, Horst A., and Carl-Louis Sandblom. Operations research: A model-based approach. Springer Nature, 2022.
 """
 module BasicSchedule
-export SchProjGraph, AbstractProjGraph, ProjGraph, make_ProjGraph, SchProjGraphLP, AbstractProjGraphLP, SchProjGraphLP, optimize_ProjGraphLP, 
-    SchProjGraphCPM, AbstractProjGraphCPM, ProjGraphCPM, forward_pass!, backward_pass!, find_critical_path, SchProjGraphNPV, AbstractProjGraphNPV, 
-    ProjGraphNPV, optimize_ProjGraphLP, SchAccelProjGraph, AbstractAccelProjGraph, AccelProjGraph, make_AccelProjGraph, optimize_AccelProjGraph!
+export SchProjGraph, AbstractProjGraph, ProjGraph, make_ProjGraph, 
+    SchProjGraphLP, AbstractProjGraphLP, SchProjGraphLP, optimize_ProjGraphLP, 
+    SchProjGraphCPM, AbstractProjGraphCPM, ProjGraphCPM, forward_pass!, backward_pass!, find_critical_path, 
+    SchProjGraphNPV, AbstractProjGraphNPV, ProjGraphNPV, optimize_ProjGraphNPV, 
+    SchAccelProjGraph, AbstractAccelProjGraph, AccelProjGraph, make_AccelProjGraph, optimize_AccelProjGraph!
 
 using Catlab, DataFrames
 using JuMP, HiGHS
@@ -277,13 +279,11 @@ A concrete acset type that inherits from `AbstractProjGraphNPV`
 Formulate and solve the maximization of NPV under no resource constraints
 according to the model in 4.4.1 from Ulusoy, G., & Hazır, Ö. (2021). Introduction to Project Modeling and Planning.
 
-The argument `D` is a due date, which cannot be less than the earliest project duration time calculated
-by CPM. α is the discount rate (cost of capital).
+α is the discount rate (cost of capital).
 
 Returns a `JuMP.Model` object, and updates the input `g` with the optimized decision variables.
 """
-function optimize_ProjGraphLP(g::T, D::Int, α::Float64) where {T<:AbstractProjGraphNPV}
-    @assert D ≥ g[nv(g), :ef]
+function optimize_ProjGraphNPV(g::T, α::Float64) where {T<:AbstractProjGraphNPV}
 
     jumpmod = JuMP.Model(HiGHS.Optimizer)
 
@@ -302,27 +302,23 @@ function optimize_ProjGraphLP(g::T, D::Int, α::Float64) where {T<:AbstractProjG
 
     # con: precedence relations among activities (4.26)
     for e in edges(g)
-        tgt_start = sum(t->(t-g[e, (:tgt, :duration)]) * g[e, (:tgt, :x)][t], g[e, (:tgt, :ef)]:g[e, (:tgt, :lf)])
+        tgt_end = sum(t->t * g[e, (:tgt, :x)][t], g[e, (:tgt, :ef)]:g[e, (:tgt, :lf)])
         src_end = sum(t->t * g[e, (:src, :x)][t], g[e, (:src, :ef)]:g[e, (:src, :lf)])
         @constraint(
             jumpmod,
-            tgt_start - src_end ≥ 0
+            tgt_end - src_end ≥ g[e, (:tgt, :duration)]
         )
     end
 
-    # # con: due date (4.28)
-    # @constraint(
-    #     jumpmod,
-    #     sum(t->t * g[nv(g), :x][t], 1:D) ≤ D
-    # )
-
     # obj: maximize NPV
-    @expression(jumpmod, npv[v in vertices(g)], sum(exp(-α*t)*g[v, :C]*g[v, :x] for t in g[v, :ef]:g[v, :lf]))
+    @expression(jumpmod, npv[v in vertices(g)], sum(exp(-α*t)*g[v, :C]*g[v, :x][t] for t in g[v, :ef]:g[v, :lf]))
     @objective(jumpmod, Max, sum(sum.(jumpmod[:npv])))
-    
+        
     optimize!(jumpmod)
         
-    g[:,:x] = value.(g[:,:x])    
+    for v in vertices(g)
+        g[v,:x] = sum(t*value(g[v,:x][t]) for t in g[v,:ef]:g[v,:lf])
+    end
 
     return jumpmod
 end
