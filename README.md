@@ -4,6 +4,8 @@ Operations Research with Composable, Algebraic Structure. At least the first two
 
 I use the [ACSet](https://github.com/AlgebraicJulia/ACSets.jl) data structure (although actually just importing all of [Catlab.jl](https://github.com/AlgebraicJulia/Catlab.jl) to do so) to structure problem definitions. ACSets (short for "attributed C-Set") are a data structure developed from applied category theory which generalize graphs, databases, etc. I find they allow an elegant expression of many classical problems. Also, I occasionally contribute to the AlgebraicJulia organization which supports them, and hope they become more popular, so this is an experiment to see just how useful they can be.
 
+For running mathematical programming, I rely on the excellent [JuMP](https://jump.dev/) ecosystem, and the open source solver [HiGHS](https://highs.dev/).
+
 Right now, there is a single module `BasicSchedule` which contains basic functionality for planning/scheduling problems (derivatives of critical path method, etc). Material in it largely derives from the following references:
 
   1. Ulusoy, Gündüz, et al. Introduction to Project Modeling and Planning. Springer International Publishing, 2021.

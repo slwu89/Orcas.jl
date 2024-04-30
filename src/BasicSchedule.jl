@@ -323,6 +323,21 @@ function optimize_ProjGraphNPV(g::T, α::Float64) where {T<:AbstractProjGraphNPV
     return jumpmod
 end
 
+# --------------------------------------------------------------------------------
+# Proj scheduling + resource constraints
+# from section beginning on p. 320 in Eiselt, Horst A., and Carl-Louis Sandblom. Decision analysis, location models, and scheduling problems. Springer Science & Business Media, 2013.
+
+# we want 2 objs:
+# 1. Min proj completion time
+# 2. Min max resource useage
+
+# dvs:
+# 1. for each task, binary x_t if its finished then or not
+
+# need cons:
+# 1. precedence cons
+# 2. sum x_t = 1 for each task (ensure it actually finishes)
+
 
 # --------------------------------------------------------------------------------
 # AoN + acceleration (crashing)
