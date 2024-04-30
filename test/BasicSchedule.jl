@@ -158,7 +158,7 @@ proj_df = DataFrame(
 projnet = make_ProjGraph(proj_df)
 to_graphviz(projnet, node_labels=:label)
 
-projnet_npv = ProjGraphNPV{Symbol,Int,Union{Containers.DenseAxisArray,Vector{Float64}},Float64}()
+projnet_npv = ProjGraphNPV{Symbol,Int,Union{Containers.DenseAxisArray,Float64},Float64}()
 copy_parts!(projnet_npv, projnet)
 
 projnet_npv[:,:C] = [0,-140,318,312,-329,153,193,361,24,33,387,-386,171,0]
@@ -171,3 +171,47 @@ cV, cE = find_critical_path(projnet_npv)
 
 cg = Subobject(projnet_npv, V=cV, E=cE)
 to_graphviz(cg, node_labels=:label)
+
+# optimize it
+g = deepcopy(projnet_npv)
+α = 0.01
+jumpmod = JuMP.Model(HiGHS.Optimizer)
+
+# dv: when does each task finish + the constraint for them to all actually finish (4.25, 4.27)
+for v in vertices(g)
+    g[v,:x] = @variable(
+        jumpmod,
+        [t ∈ g[v,:ef]:g[v,:lf]],
+        Bin
+    )
+    @constraint(
+        jumpmod,
+        sum(g[v,:x]) == 1
+    )
+end
+
+# con: precedence relations among activities (4.26)
+for e in edges(g)
+    tgt_start = sum(t->(t-g[e, (:tgt, :duration)]) * g[e, (:tgt, :x)][t], g[e, (:tgt, :ef)]:g[e, (:tgt, :lf)])
+    src_end = sum(t->t * g[e, (:src, :x)][t], g[e, (:src, :ef)]:g[e, (:src, :lf)])
+    @constraint(
+        jumpmod,
+        tgt_start - src_end ≥ 0
+    )
+end
+
+# # con: due date (4.28)
+# @constraint(
+#     jumpmod,
+#     sum(t->t * g[nv(g), :x][t], 1:D) ≤ D
+# )
+
+# obj: maximize NPV
+@expression(jumpmod, npv[v in vertices(g)], sum(exp(-α*t)*g[v, :C]*g[v, :x] for t in g[v, :ef]:g[v, :lf]))
+@objective(jumpmod, Max, sum(sum.(jumpmod[:npv])))
+
+optimize!(jumpmod)
+    
+for v in vertices(g)
+    g[v,:x] = sum(t*value(g[v,:x][t]) for t in g[v,:ef]:g[v,:lf])
+end

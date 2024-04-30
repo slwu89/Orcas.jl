@@ -1,6 +1,6 @@
 name = "Orcas"
 uuid = "2e9ce2e4-e7c5-41f6-aeae-c943fda824fc"
-authors = ["slwu89 <10673535+slwu89@users.noreply.github.com>"]
+authors = ["Sean L. Wu <10673535+slwu89@users.noreply.github.com>"]
 version = "0.1.0"
 
 [deps]
