@@ -279,8 +279,11 @@ end
 
 for j in parts(stn_opt, :Unit)
   Ij = stn_opt[incident(stn_opt, j, :ut_u), :ut_t]
-  for i in Ij, t in stn_opt[:,:h]
-    # W_ijt = incident()  
+  for i in Ij, t in stn_opt[:,:t]
+    @constraint(
+      jumpmod,
+
+    )
   end
 end
 
@@ -299,4 +302,17 @@ incident(stn_opt, j, :utt_unit)
 # the i index in W_ijt
 incident(stn_opt, i, :utt_task)
 
+# W_ijt
 W_ijt(stn_opt, i, j, 11)
+
+# the LHS sum term
+sum(W_ijt(stn_opt,i′,j,t′) for i′ in Ij, t′ in t:t+stn_opt[i,:time]-1)
+
+# it should not be for all t, it should only be until the last
+# t for which it is possible to finish it.
+
+# valid times for task i
+stn_opt[:,:t] .+ stn_opt[i,:time] .- 1 .<= stn_opt[nparts(stn_opt,:Time),:t]
+
+# valid times are leq than this
+stn_opt[nparts(stn_opt,:Time),:t] - (stn_opt[i,:time] - 1)
