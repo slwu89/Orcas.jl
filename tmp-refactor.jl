@@ -2,7 +2,7 @@
 using Catlab
 using JuMP, HiGHS
 
-const VectorJuMPVar = Union{Float64, Vector{Float64}, Containers.DenseAxisArray{JuMP.VariableRef}, Vector{JuMP.VariableRef}}
+# const VectorJuMPVar = Union{Float64, Vector{Float64}, Containers.DenseAxisArray{JuMP.VariableRef}, Vector{JuMP.VariableRef}}
 const JuMPVar = Union{Float64, JuMP.VariableRef}
 
 """
@@ -19,27 +19,27 @@ end
 #   * I_j in the text is the set of tasks which can be performed by unit j,
 #     here it is stn[incident(stn, j, :ku), :kt]
 @present StateTaskNetSch(FreeSchema) begin
-    (S,T,I,O,U,K)::Ob
-    is::Hom(I,S)
-    it::Hom(I,T)
-    os::Hom(O,S)
-    ot::Hom(O,T)
-    ku::Hom(K,U)
-    kt::Hom(K,T)
+    (State,Task,Input,Output,Unit,UnTsk)::Ob
+    is::Hom(Input,State)
+    it::Hom(Input,Task)
+    os::Hom(Output,State)
+    ot::Hom(Output,Task)
+    ut_u::Hom(UnTsk,Unit)
+    ut_t::Hom(UnTsk,Task)
 
     Label::AttrType
-    state::Attr(S,Label)
-    task::Attr(T,Label)
-    unit::Attr(U,Label)
+    state::Attr(State,Label)
+    task::Attr(Task,Label)
+    unit::Attr(Unit,Label)
 
     Real::AttrType
-    storage::Attr(S,Real)
-    inprop::Attr(I,Real)
-    outprop::Attr(O,Real)
-    outtime::Attr(O,Real)
-    time::Attr(T,Real)
-    vmax::Attr(K,Real)
-    vmin::Attr(K,Real)
+    storage::Attr(State,Real)
+    inprop::Attr(Input,Real)
+    outprop::Attr(Output,Real)
+    outtime::Attr(Output,Real)
+    time::Attr(Task,Real)
+    vmax::Attr(UnTsk,Real)
+    vmin::Attr(UnTsk,Real)
 end
 
 to_graphviz(StateTaskNetSch, graph_attrs=Dict(:size=>"7",:ratio=>"fill"))
@@ -72,18 +72,25 @@ The additional elements are:
 @present StateTaskNetOptSch <: StateTaskNetSch begin
   JumpType::AttrType
   TimeType::AttrType
-  (IJT,ST,H)::Ob
+  
+  (Time,UnTskTime,StTime)::Ob
 
-  h::Attr(H,TimeType)
+  t::Attr(Time,TimeType)
 
-  ij::Hom(IJT, K)
-  t1::Hom(IJT,H)
-  w_dv::Attr(IJT,JumpType)
-  b_dv::Attr(IJT,JumpType)
+  utt_ut::Hom(UnTskTime,UnTsk)
+  utt_t::Hom(UnTskTime,Time)
+  # testing
+  utt_unit::Hom(UnTskTime,Unit)
+  utt_unit == compose(utt_ut, ut_u)
+  utt_task::Hom(UnTskTime,Task)
+  utt_task == compose(utt_ut, ut_t)
+  # testing
+  w_dv::Attr(UnTskTime,JumpType)
+  b_dv::Attr(UnTskTime,JumpType)
 
-  s::Hom(ST,S)
-  t2::Hom(ST,H)
-  s_dv::Attr(ST,JumpType)
+  st_s::Hom(StTime,State)
+  st_t::Hom(StTime,Time)
+  s_dv::Attr(StTime,JumpType)
 end
 
 to_graphviz(StateTaskNetOptSch, graph_attrs=Dict(:size=>"7",:ratio=>"fill",:dpi=>"120"))
@@ -92,73 +99,73 @@ to_graphviz(StateTaskNetOptSch, graph_attrs=Dict(:size=>"7",:ratio=>"fill",:dpi=
 
 @acset_type StateTaskNetOpt(StateTaskNetOptSch, index=nameof.(generators(StateTaskNetOptSch,:Hom))) <: AbstractStateTaskNetOpt
 
-"""
-``S_i``: set of states which feed task ``i``
-"""
-function feeds(stn::AbstractStateTaskNet, i::Int)
-    stn[incident(stn, i, :it), :is]
-end
-feeds(stn::AbstractStateTaskNet, i) = feeds(stn, only(incident(stn, i, :task)))
+# """
+# ``S_i``: set of states which feed task ``i``
+# """
+# function feeds(stn::AbstractStateTaskNet, i::Int)
+#     stn[incident(stn, i, :it), :is]
+# end
+# feeds(stn::AbstractStateTaskNet, i) = feeds(stn, only(incident(stn, i, :task)))
 
-"""
-``\\overline{S_{i}}``: set of states which task ``i`` produces as its outputs
-"""
-function generates(stn::AbstractStateTaskNet, i::Int)
-    stn[incident(stn, i, :ot), :os]
-end
-generates(stn::AbstractStateTaskNet, i) = generates(stn, only(incident(stn, i, :task)))
+# """
+# ``\\overline{S_{i}}``: set of states which task ``i`` produces as its outputs
+# """
+# function generates(stn::AbstractStateTaskNet, i::Int)
+#     stn[incident(stn, i, :ot), :os]
+# end
+# generates(stn::AbstractStateTaskNet, i) = generates(stn, only(incident(stn, i, :task)))
 
-"""
-``T_s``: set of tasks receiving material from state ``s``
-"""
-function receives(stn::AbstractStateTaskNet, s::Int) 
-    stn[incident(stn, s, :os), :ot]
-end
-receives(stn::AbstractStateTaskNet, s) = receives(stn, only(incident(stn, s, :state)))
+# """
+# ``T_s``: set of tasks receiving material from state ``s``
+# """
+# function receives(stn::AbstractStateTaskNet, s::Int) 
+#     stn[incident(stn, s, :os), :ot]
+# end
+# receives(stn::AbstractStateTaskNet, s) = receives(stn, only(incident(stn, s, :state)))
 
-"""
-``\\overline{T_{s}}``: set of tasks producing material in state ``s``
-"""
-function produces(stn::AbstractStateTaskNet, s::Int)
-    stn[incident(stn, s, :is), :it]
-end
-produces(stn::AbstractStateTaskNet, s) = produces(stn, only(incident(stn, s, :state)))
+# """
+# ``\\overline{T_{s}}``: set of tasks producing material in state ``s``
+# """
+# function produces(stn::AbstractStateTaskNet, s::Int)
+#     stn[incident(stn, s, :is), :it]
+# end
+# produces(stn::AbstractStateTaskNet, s) = produces(stn, only(incident(stn, s, :state)))
 
-"""
-``K_i``: set of units capable of performing task ``i``
-"""
-function units(stn::AbstractStateTaskNet, i::Int)
-    stn[incident(stn, i, :kt), :ku]
-end
-units(stn::AbstractStateTaskNet, i) = units(stn, only(incident(stn, i, :task)))
+# """
+# ``K_i``: set of units capable of performing task ``i``
+# """
+# function units(stn::AbstractStateTaskNet, i::Int)
+#     stn[incident(stn, i, :kt), :ku]
+# end
+# units(stn::AbstractStateTaskNet, i) = units(stn, only(incident(stn, i, :task)))
 
 # make the example STN from paper (fig 3)
 stn = @acset StateTaskNet{Symbol,Float64} begin
-    S=9
+    State=9
     state=[:FeedA,:HotA,:Product1,:FeedB,:IntBC,:FeedC,:IntAB,:ImpureE,:Product2]
     storage=[Inf,100,Inf,Inf,150,Inf,200,100,Inf]
-    T=5
+    Task=5
     task=[:Heating,:Reaction2,:Reaction1,:Reaction3,:Separation]
-    U=4
+    Unit=4
     unit=[:Heater,:Reactor1,:Reactor2,:Still]
-    I=8
+    Input=8
     is=[1,2,4,5,6,6,7,8]
     it=[1,2,3,2,3,4,4,5]
     inprop=[1,0.4,0.5,0.6,0.5,0.2,0.8,1]
-    O=7
+    Output=7
     ot=[1,2,2,3,4,5,5]
     os=[2,3,7,5,8,7,9]
     outprop=[1,0.4,0.6,1,1,0.1,0.9]
     outtime=[1,2,2,2,1,2,1]
-    K=8
-    ku=[1,2,2,2,3,3,3,4]
-    kt=[1,2,3,4,2,3,4,5]
+    UnTsk=8
+    ut_u=[1,2,2,2,3,3,3,4]
+    ut_t=[1,2,3,4,2,3,4,5]
     vmin=zeros(8)
     vmax=[100,80,80,80,50,50,50,200]
 end
 
 # check proportions correct and set time
-for t in parts(stn, :T)
+for t in parts(stn, :Task)
     @assert sum(stn[incident(stn, t, :ot), :outprop]) == 1
     @assert sum(stn[incident(stn, t, :it), :inprop]) == 1
     stn[t,:time] = maximum(stn[incident(stn, t, :ot), :outtime])
@@ -177,27 +184,27 @@ function to_graphviz_property_graph(stn::AbstractStateTaskNet;
     node = merge!(NODE_ATTRS, node_attrs),
     edge = merge!(EDGE_ATTRS, edge_attrs),
   )
-  S_vtx = Dict(map(parts(stn, :S)) do s
+  S_vtx = Dict(map(parts(stn, :State)) do s
     s => add_vertex!(pg; label="$(stn[s,:state])", shape="circle")
   end)
-  T_vtx = Dict(map(parts(stn, :T)) do t
+  T_vtx = Dict(map(parts(stn, :Task)) do t
     t => add_vertex!(pg; label="$(stn[t,:task])", shape="rectangle")
   end)
-  U_vtx = Dict(map(parts(stn, :U)) do u
+  U_vtx = Dict(map(parts(stn, :Unit)) do u
     u => add_vertex!(pg; label="$(stn[u,:unit])", shape="cylinder")
   end)
 
   edges = Dict{Tuple{Int,Int}, Int}()
-  map(parts(stn, :I)) do i
+  map(parts(stn, :Input)) do i
     edge = (S_vtx[stn[i, :is]], T_vtx[stn[i, :it]])
     edges[edge] = get(edges, edge, 0) + 1
   end
-  map(parts(stn, :O)) do o
+  map(parts(stn, :Output)) do o
     edge = (T_vtx[stn[o, :ot]], S_vtx[stn[o, :os]])
     edges[edge] = get(edges, edge, 0) + 1
   end
-  map(parts(stn, :K)) do k
-    edge = (U_vtx[stn[k,:ku]], T_vtx[stn[k,:kt]])
+  map(parts(stn, :UnTsk)) do k
+    edge = (U_vtx[stn[k,:ut_u]], T_vtx[stn[k,:ut_t]])
     edges[edge] = get(edges, edge, 0) + 1
   end
   for ((src, tgt),count) in edges
@@ -216,29 +223,31 @@ copy_parts!(stn_opt, stn)
 dt = minimum(stn_opt[:,:time])
 H = 10
 
-add_parts!(stn_opt, :H, length(1:dt:H+1), h=Int.(collect(1:dt:H+1)))
+add_parts!(stn_opt, :Time, length(1:dt:H+1), t=Int.(collect(1:dt:H+1)))
 
 ST = product(
-  FinSet(nparts(stn_opt, :H)), 
-  FinSet(nparts(stn_opt, :S))
+  FinSet(nparts(stn_opt, :Time)), 
+  FinSet(nparts(stn_opt, :State))
 )
 
 add_parts!(
-  stn_opt, :ST, length(apex(ST)),
-  t2 = legs(ST)[1],
-  s = legs(ST)[2]
+  stn_opt, :StTime, length(apex(ST)),
+  st_t = legs(ST)[1],
+  st_s = legs(ST)[2]
 )
 
 IJT = product(
-  FinSet(nparts(stn_opt, :H)),
-  FinSet(nparts(stn_opt, :K))
+  FinSet(nparts(stn_opt, :Time)),
+  FinSet(nparts(stn_opt, :UnTsk))
 )
 
 add_parts!(
-  stn_opt, :IJT, length(apex(IJT)),
-  t1 = legs(IJT)[1],
-  ij = legs(IJT)[2]
+  stn_opt, :UnTskTime, length(apex(IJT)),
+  utt_t = legs(IJT)[1],
+  utt_ut = legs(IJT)[2]
 )
+stn_opt[:,:utt_task] = stn_opt[:,(:utt_ut, :ut_t)]
+stn_opt[:,:utt_unit] = stn_opt[:,(:utt_ut, :ut_u)]
 
 # do the jump model
 jumpmod = JuMP.Model(HiGHS.Optimizer)
