@@ -225,26 +225,26 @@ H = 10
 
 add_parts!(stn_opt, :Time, length(1:dt:H+1), t=Int.(collect(1:dt:H+1)))
 
-ST = product(
-  FinSet(nparts(stn_opt, :Time)), 
-  FinSet(nparts(stn_opt, :State))
+StTime = product(
+  FinSet(nparts(stn_opt, :State)),
+  FinSet(nparts(stn_opt, :Time))  
 )
 
 add_parts!(
-  stn_opt, :StTime, length(apex(ST)),
-  st_t = legs(ST)[1],
-  st_s = legs(ST)[2]
+  stn_opt, :StTime, length(apex(StTime)),  
+  st_s = legs(StTime)[1],
+  st_t = legs(StTime)[2]
 )
 
-IJT = product(
-  FinSet(nparts(stn_opt, :Time)),
-  FinSet(nparts(stn_opt, :UnTsk))
+UnTaskTime = product(
+  FinSet(nparts(stn_opt, :UnTsk)),
+  FinSet(nparts(stn_opt, :Time))
 )
 
 add_parts!(
-  stn_opt, :UnTskTime, length(apex(IJT)),
-  utt_t = legs(IJT)[1],
-  utt_ut = legs(IJT)[2]
+  stn_opt, :UnTskTime, length(apex(UnTaskTime)),  
+  utt_ut = legs(UnTaskTime)[1],
+  utt_t = legs(UnTaskTime)[2]
 )
 stn_opt[:,:utt_task] = stn_opt[:,(:utt_ut, :ut_t)]
 stn_opt[:,:utt_unit] = stn_opt[:,(:utt_ut, :ut_u)]
@@ -253,29 +253,50 @@ stn_opt[:,:utt_unit] = stn_opt[:,(:utt_ut, :ut_u)]
 jumpmod = JuMP.Model(HiGHS.Optimizer)
 
 # make decision vars
-for ijt in parts(stn_opt, :IJT)
-  stn_opt[ijt, :w_dv] = @variable(jumpmod, binary=true)
-  stn_opt[ijt, :b_dv] = @variable(jumpmod)
+for i in parts(stn_opt, :UnTskTime)
+  stn_opt[i, :w_dv] = @variable(jumpmod, binary=true)
+  stn_opt[i, :b_dv] = @variable(jumpmod)
 end
 
-for st in parts(stn_opt, :ST)
-  stn_opt[st, :s_dv] = @variable(jumpmod)
+for i in parts(stn_opt, :StTime)
+  stn_opt[i, :s_dv] = @variable(jumpmod)
 end
 
 # # constraints
 
 # # 3.1.1: allocation constraints
-# i: task, j: unit, t: time
-for j in parts(stn_opt, :U), t in stn_opt[:,:h]
-  Ij = stn_opt[incident(stn_opt, j, :ku), :kt]
-  for i in Ij
-    # @constraint(
-    #   jumpmod,
-    #   sum(stn_opt[multi_incident(stn_opt, j, (:ij, :ku), t, (:t1, :h)), :w_dv]) ≤ 1
-    # )
+# i: task, j: unit, t: time\
+
+# helper fn
+W_ijt(acs,i,j,t) = begin
+  acs[
+    only(intersect(
+      incident(acs, i, :utt_task), incident(acs, j, :utt_unit), incident(acs, t, (:utt_t, :t))
+    )),
+    :w_dv
+  ]
+end
+
+for j in parts(stn_opt, :Unit)
+  Ij = stn_opt[incident(stn_opt, j, :ut_u), :ut_t]
+  for i in Ij, t in stn_opt[:,:h]
+    # W_ijt = incident()  
   end
 end
 
+j=2
+t=1
+Ij = stn_opt[incident(stn_opt, j, :ut_u), :ut_t]
+i=Ij[1]
 
-# parts(stn_opt, :T)
-# getindex.(stn_opt[units(stn_opt, 2), :Wt],2)
+# the t' indices in W_i'jt'
+t=stn_opt[1,:t]
+vcat(incident(stn_opt, t:t+stn_opt[i,:time]-1, (:utt_t, :t))...)
+
+# the j index in W_ijt
+incident(stn_opt, j, :utt_unit)
+
+# the i index in W_ijt
+incident(stn_opt, i, :utt_task)
+
+W_ijt(stn_opt, i, j, 11)
