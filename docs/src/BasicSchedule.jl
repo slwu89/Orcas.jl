@@ -10,6 +10,8 @@ using Orcas, Orcas.BasicSchedule
 #   2. Eiselt, Horst A., and Carl-Louis Sandblom. Decision analysis, location models, and scheduling problems. Springer Science & Business Media, 2013.
 #   3. Eiselt, Horst A., and Carl-Louis Sandblom. Operations research: A model-based approach. Springer Nature, 2022.
 
+# We use a "activity on node" (AoN) representation of project networks throughout the package.
+
 # ## Basic Critial Path Method
 
 # The critical path method (CPM) is a classic technique in operations research. Given a set of tasks which represent
@@ -57,3 +59,9 @@ cV, cE = find_critical_path(projnet_cpm)
 
 cg = Subobject(projnet_cpm, V=cV, E=cE)
 to_graphviz(cg, node_labels=:label)
+
+# ### Project Acceleration
+
+# A key idea behind analysis of project networks via CPM is that if we want to speed up the project, we can only do so
+# be "accelerating" tasks on the critical path, and further more, that once we speed up the slowest task on the 
+# critical path and recalculate the new critical path, it will contain more tasks.

@@ -2,10 +2,10 @@ using Orcas
 using Documenter
 using Literate
 
-
 example_base = joinpath(dirname(@__FILE__), "src")
 adliterate = [
-        ("BasicSchedule.jl", "BasicSchedule")
+        ("BasicSchedule.jl", "BasicSchedule"),
+        ("StateTaskNetwork.jl", "StateTaskNetwork")
     ]
 literate_subdir = joinpath(example_base, "literate")
 isdir(literate_subdir) || mkdir(literate_subdir)
@@ -29,6 +29,9 @@ makedocs(;
         "Home" => "index.md",
         "Basic Scheduling" => [
             "BasicSchedule.md",
+        ],
+        "State Task Networks" => [
+            "StateTaskNetwork.md"
         ],
         "Reference" => "reference.md"
     ],
