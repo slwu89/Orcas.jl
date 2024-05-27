@@ -40,4 +40,4 @@ for t in parts(stn, :Task)
     stn[t,:time] = maximum(stn[incident(stn, t, :ot), :outtime])
 end
 
-to_graphviz(to_graphviz_property_graph(stn))
+to_graphviz_property_graph(stn) |> to_graphviz
