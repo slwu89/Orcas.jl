@@ -48,17 +48,17 @@ X = @variable(
     Bin
 )
 
+M = @variable(
+    jumpmod,
+    M[j ∈ 1:ns(pn), i ∈ 1:K],
+    Int
+)
+
 # eqn 5d
 @constraint(
     jumpmod,
     [i ∈ 1:K],
     sum(X[:,i]) == 1
-)
-
-M = @variable(
-    jumpmod,
-    M[j ∈ 1:ns(pn), i ∈ 1:K],
-    Int
 )
 
 # eqn 5a
@@ -101,5 +101,121 @@ value.(M)
 # system F_2(K)
 # - allow multiple transitions to fire at the same time
 
+K=2
+
+jumpmod = JuMP.Model(HiGHS.Optimizer)
+
+X = @variable(
+    jumpmod,
+    X[j ∈ 1:nt(pn), i ∈ 1:K] ≥ 0,
+    Int
+)
+
+M = @variable(
+    jumpmod,
+    M[j ∈ 1:ns(pn), i ∈ 1:K] ≥ 0,
+    Int
+)
+
+# eqn 6a
+@constraint(
+    jumpmod,
+    m0 ≥ pre * X[:,1]
+)
+
+@constraint(
+    jumpmod,
+    [i ∈ 2:K],
+    M[:, i-1] ≥ pre * X[:,i]
+)
+
+# eqn 6b
+@constraint(
+    jumpmod,
+    M[:, 1] == m0 + C * X[:, 1]
+)
+
+@constraint(
+    jumpmod,
+    [i ∈ 2:K],
+    M[:, i] == M[:, i-1] + C * X[:, i]
+)
+
+# eqn 6c
+@constraint(
+    jumpmod,
+    M[:, K] == mf
+)
+
+optimize!(jumpmod)
+
+value.(X)
+value.(M)
+
 # define 2 sub-problems associated with the original reachability problem
 # which can be solved using F_2(K).
+
+# definition 9: fixed depth reachability problem
+# P_1(K): find a step sequence from m0 to mf in at most k steps
+
+# definition 10: shortest length reachability problem
+# P_2: find the mininal length (k_min) sequence of steps to reach
+# mf from m0.
+
+# 3.1 integer programming model (Eqns 9)
+# IP(K), solves P_2
+K=2
+
+jumpmod = JuMP.Model(HiGHS.Optimizer)
+
+X = @variable(
+    jumpmod,
+    X[j ∈ 1:nt(pn), i ∈ 1:K] ≥ 0,
+    Int
+)
+
+# eqn 9b
+@constraint(
+    jumpmod,
+    [i ∈ 1:K],
+    sum(C * X[:,i-1] for j in 1:i-1, init=zeros(AffExpr, ns(pn))) - pre * X[:,i] ≥ -m0
+)
+
+# eqn 9c
+@constraint(
+    jumpmod,
+    sum(C * X[:,i] for i in 1:K) == mf - m0
+)
+
+# obj2
+@objective(
+    jumpmod,
+    Min,
+    sum(X)
+)
+
+# # obj 3
+# BigM = 1000
+
+# Y = @variable(
+#     jumpmod,
+#     [i ∈ 1:K],
+#     Bin
+# )
+
+# @constraint(
+#     jumpmod,
+#     [i ∈ 1:K],
+#     sum(X[:,i]) ≤ Y[i] * BigM
+# )
+
+# @objective(
+#     jumpmod,
+#     Min,
+#     sum(Y)
+# )
+
+optimize!(jumpmod)
+
+value.(X)
+
